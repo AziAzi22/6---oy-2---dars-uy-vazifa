@@ -188,7 +188,7 @@ CREATE INDEX index_teachers_city ON teachers("city");
 CREATE INDEX index_lessons_name ON lessons("name");
 
 
--- 2  ORDER BY
+-- 2  ORDER BY AND GROUP BY
 
 -- DESC
 
@@ -206,67 +206,249 @@ JOIN grades grade ON student.id = grade.student_id
 GROUP BY student.id, student.full_name
 ORDER BY avg_grade ASC;
 
+-- 3  OFFSET LIMIT
+
+SELECT student.full_name, AVG(grade.grade) AS avg_grade
+FROM students student
+JOIN grades grade ON student.id = grade.student_id
+GROUP BY student.id, student.full_name
+ORDER BY avg_grade DESC OFFSET 5 LIMIT 10;
+
+-- 4 GROUP BY
+
+SELECT
+    "city",
+    COUNT(*) AS people_count
+FROM (
+    SELECT "city" FROM students
+    UNION ALL
+    SELECT "city" FROM teachers 
+) cities
+GROUP BY "city" ORDER BY people_count DESC;
+
+-- 5 AS 
+
+SELECT
+"full_name",
+"birth_date" AS "tug'ilgan_sana"
+FROM students
+ORDER BY "full_name" DESC;
+
+SELECT
+"full_name",
+    EXTRACT(YEAR FROM AGE(birth_date)) AS "tug'ilgan_yil"
+FROM teachers;
+
+
+
+-- 6 UNIUON
+
+-- xar bir studentda 6 ta fan bor edi endi 3 tadan fan bor: 
+
+
+DROP TABLE IF EXISTS grades;
+
+CREATE TABLE grades (
+    "id" SERIAL PRIMARY KEY,
+    "student_id" INT REFERENCES students(id) ON DELETE CASCADE,
+    "lesson_id" INT REFERENCES lessons(id) ON DELETE CASCADE,
+    "grade" INT CHECK ("grade" BETWEEN 0 AND 100)
+);
+
+
+INSERT INTO grades ("student_id", "lesson_id", "grade")
+SELECT
+    student_id,
+    lesson_id,
+    (random() * 40 + 60)::int AS grade
+FROM (
+    SELECT
+        s.id AS student_id,
+        l.id AS lesson_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY s.id
+            ORDER BY random()
+        ) AS rn
+    FROM students s
+    CROSS JOIN lessons l
+) t
+WHERE rn <= 3;
+
+
+-- UNION 
+
+SELECT DISTINCT s.id, s.full_name, l.name AS lesson_name
+FROM students s
+JOIN grades g ON g.student_id = s.id
+JOIN lessons l ON l.id = g.lesson_id
+WHERE l.name = 'Math'
+
+UNION
+
+SELECT DISTINCT s.id, s.full_name, l.name AS lesson_name
+FROM students s
+JOIN grades g ON g.student_id = s.id
+JOIN lessons l ON l.id = g.lesson_id
+WHERE l.name = 'Physics'
+ORDER BY full_name, lesson_name;
+
+
+-- 7 HAVING 
+
+SELECT s.id, s.full_name,
+AVG(g.grade) AS avg_grade
+FROM students s
+JOIN grades g ON g.student_id = s.id
+GROUP BY s.id, s.full_name
+HAVING AVG(g.grade) > 80
+ORDER BY avg_grade DESC;
+
+-------------------------------------------------------------------------------------------->>>>>>>>>>
+-- 8 - yo'q akan ustoz -----------------------------------------------------<<<<<<<<<<<<<<<<<<<<<<<<<<
+-------------------------------------------------------------------------------------------->>>>>>>>>>
+
+-- 9 BEETWEN OR AND
+
+
+SELECT s.id, s.full_name, s.city,
+AVG(g.grade) AS avg_grade
+FROM students s
+JOIN grades g ON g.student_id = s.id
+GROUP BY s.id, s.full_name, s.city
+HAVING AVG(g.grade) BETWEEN 70 AND 90 or s.city = 'Tashkent'
+ORDER BY s.city DESC;
+
+-- 10 ILIKE 
+
+SELECT "full_name"
+FROM (
+    SELECT "full_name" FROM students
+    UNION ALL
+    SELECT "full_name" FROM teachers 
+) full_names
+WHERE "full_name" ilike 'sh%' or "full_name" ilike '%sh';
 
 
 
 
 
+-- 1 INDEX 
+
+-- index lab qo'yibman tepada
+
+
+-- 2 ORDER BY va LIMIT
+
+SELECT student.full_name, AVG(grade.grade) AS avg_grade
+FROM students student
+JOIN grades grade ON student.id = grade.student_id
+GROUP BY student.id, student.full_name
+ORDER BY avg_grade DESC LIMIT 10;
+
+
+-- 3 GROUB BY va HAVING
+-- o'rta baxosi 85 dan katta yo'q ekan lekin 80 dan katta bor ekan bitta
+
+
+SELECT lesson.id AS lesson_id,
+       lesson.name As lesson_name,
+       AVG(grade.grade) AS avg_grade
+FROM lessons lesson
+JOIN grades grade ON grade.lesson_id = lesson.id
+GROUP BY lesson.id, lesson.name
+HAVING AVG(grade.grade) > 80
+ORDER BY avg_grade DESC;
 
 
 
 
+-- 4 UNION va AS
+
+
+SELECT
+    c.city AS "shahar_turi",
+    COUNT(DISTINCT s.id) AS studentlar_soni,
+    COUNT(DISTINCT t.id) AS ustozlar_soni
+FROM (
+    SELECT city FROM students
+    UNION
+    SELECT city FROM teachers
+) c
+LEFT JOIN students s ON s.city = c.city
+LEFT JOIN teachers t ON t.city = c.city
+GROUP BY "shahar_turi"
+ORDER BY c.city;
+
+
+-- 5 BEETWEN OR AND
+
+
+SELECT s.id, s.full_name, s.city, 
+EXTRACT(YEAR FROM AGE(s.birth_date)) AS age
+FROM students s
+GROUP BY s.id, s.full_name, s.city
+HAVING EXTRACT(YEAR FROM AGE(s.birth_date)) BETWEEN 18 AND 25
+OR (s.city = 'Khorezm' OR s.city = 'Samarkand')
+ORDER BY age ASC;
 
 
 
+-- 6  LIKE ILKKE
+
+ ------------------
+
+SELECT "full_name" FROM students
+WHERE "full_name" LIKE '%a'
+UNION
+SELECT "full_name" FROM teachers
+WHERE "full_name" ILIKE 'i%'
+GROUP BY "students", "teachers"
+ORDER BY "full_name";
+
+--------------------------
+
+SELECT "full_name"
+FROM students
+WHERE "full_name" LIKE '%a'
+
+UNION
+
+SELECT "full_name"
+FROM teachers
+WHERE "full_name" ILIKE 'i%'
+
+ORDER BY "full_name";
 
 
+----------------------------
 
 
+SELECT "full_name",
+        'student' AS type
+        FROM students
+        WHERE "full_name" LIKE '%a'
+
+UNION ALL
+
+SELECT "full_name",
+        'teacher' AS type
+        FROM teachers
+        WHERE "full_name" ILIKE 'i%'
+
+ORDER BY type DESC, "full_name";
 
 
+-- 7 LIMIT OFFSET
 
 
+SELECT "id", "full_name" FROM teachers
+WHERE "id" > 3 lIMIT 2; 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+---------- 
+SELECT id, full_name, city
+FROM students
+ORDER BY id
+OFFSET 5 LIMIT 7;
 
 
 
